@@ -17,13 +17,13 @@ from threads_output import ThreadManager
 def my_function(sleep_time, header):
     print(f'OUTPUT {header}')
     sleep(sleep_time)
-    print(f'done sleeping for {sleep_time} seconds')
     return f'RETURN {header}'
 
 tmanager = ThreadManager()
 tmanager.add('task1', my_function, 2, header="thing 1")
 tmanager.add('task2', my_function, 7, "thing 2")
-results = tmanager.run()
+results = tmanager.run() # use for IO bound functions
+# results = tmanger.run(type='process') # Use for CPU bound functions
 task1_return = tmanager.get_return('task1')
 tmanager.print_output()
 

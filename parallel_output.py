@@ -3,7 +3,7 @@
 
 import io
 import sys
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, wait
 import stdio_proxy
 
 
@@ -17,7 +17,7 @@ class Task:
         self.kwargs = kwargs
 
 
-class ThreadManager:
+class ParallelManager:
     """Run multiple functions in parallel and capture output"""
 
     def __init__(self):
@@ -34,23 +34,28 @@ class ThreadManager:
             self.tasks.append(Task(label, function, args, kwargs))
             self.labels.append(label)
 
-    def run(self):
-        """Run all Tasks in parallel
+    def run(self, type='thread'):
+        """Run all Tasks in parallel using ThreadPoolExecutor or ProcessPoolExecutor
 
         Returns:
             dict: containing 'return' and 'output' keys for each task label
         """
         count = len(self.tasks)
-        threads = {}
-        with ThreadPoolExecutor(count) as executor:
-            for task in self.tasks:
-                threads[task.label] = executor.submit(self.output_wrapper,
-                                                      task)
-        wait(list(threads.values()))
+        executors = {}
 
-        for label, thread in threads.items():
-            self.outputs[label] = thread.result()['output']
-            self.return_values[label] = thread.result()['return']
+        e = ThreadPoolExecutor(
+            count) if type == 'thread' else ProcessPoolExecutor(count)
+        with e as executor:
+            for task in self.tasks:
+                print(f'Staring {task.label}')
+                executors[task.label] = executor.submit(
+                    self.output_wrapper, task)
+        wait(list(executors.values()))
+        print('All Tasks Completed')
+
+        for label, exec in executors.items():
+            self.outputs[label] = exec.result()['output']
+            self.return_values[label] = exec.result()['return']
 
     def output_wrapper(self, task):
         """Calls a function and captures its output
@@ -61,6 +66,7 @@ class ThreadManager:
         buf = io.BytesIO()
         with stdio_proxy.redirect_stdout(buf):
             results = task.function(*task.args, **task.kwargs)
+        print(f'Completed {task.label}')
         return {'return': results, 'output': buf.getvalue().decode()}
 
     def get_return(self, label=None):
