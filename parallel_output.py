@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # Class to facilitate running functions in parallel but keep the output separate
 
-import io
-import sys
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, wait
 import stdio_proxy
 
@@ -29,12 +27,12 @@ class ParallelManager:
     def add(self, label, function, *args, **kwargs):
         """Add a Task"""
         if label in self.labels:
-            sys.exit(f'label {label} is not unique')
+            raise ValueError(f"label {label} is not unique")
         else:
             self.tasks.append(Task(label, function, args, kwargs))
             self.labels.append(label)
 
-    def run(self, type='thread'):
+    def run(self, exec_type="thread"):
         """Run all Tasks in parallel using ThreadPoolExecutor or ProcessPoolExecutor
 
         Returns:
@@ -43,31 +41,38 @@ class ParallelManager:
         count = len(self.tasks)
         executors = {}
 
-        e = ThreadPoolExecutor(
-            count) if type == 'thread' else ProcessPoolExecutor(count)
-        with e as executor:
+        xpe = (ThreadPoolExecutor(count) if exec_type == "thread" else ProcessPoolExecutor(count))
+        with xpe as executor:
             for task in self.tasks:
-                print(f'Staring {task.label}')
-                executors[task.label] = executor.submit(
-                    self.output_wrapper, task)
+                print(f"Staring {task.label}")
+                executors[task.label] = executor.submit(self.output_wrapper, task)
         wait(list(executors.values()))
         print('All Tasks Completed')
 
-        for label, exec in executors.items():
-            self.outputs[label] = exec.result()['output']
-            self.return_values[label] = exec.result()['return']
+        for label, ex in executors.items():
+            self.outputs[label] = ex.result()["output"]
+            self.return_values[label] = ex.result()["return"]
 
     def output_wrapper(self, task):
-        """Calls a function and captures its output
+        """
+        Calls a function and captures its output.
+        If there is an exception, return the exception as return value
 
         Returns:
             dict: containing 'return' and 'output' keys
         """
-        buf = io.BytesIO()
-        with stdio_proxy.redirect_stdout(buf):
-            results = task.function(*task.args, **task.kwargs)
-        print(f'Completed {task.label}')
-        return {'return': results, 'output': buf.getvalue().decode()}
+        #buf = io.BytesIO()
+        filename = f"/tmp/{task.label}.txt"
+        with open(filename, "wb") as outfile:
+            with stdio_proxy.redirect_stdout(outfile):
+                try:
+                    results = task.function(*task.args, **task.kwargs)
+                except Exception as err:
+                    print(f"EXCEPTION: {err}")
+                    results = err
+        print(f"Completed {task.label}")
+        with open(filename, "r") as infile:
+            return {"return": results, "output": infile.read()}
 
     def get_return(self, label=None):
         """Get the return value for a task or all return values if label is not passed"""
@@ -84,5 +89,5 @@ class ParallelManager:
     def print_output(self):
         """Print the output of all tasks"""
         for label, output in self.outputs.items():
-            print(f'\n*****{label}*****\n')
+            print(f"\n*****{label}*****\n")
             print(output)
