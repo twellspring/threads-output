@@ -14,6 +14,8 @@ class Task:
         self.args = args
         self.kwargs = kwargs
 
+    def __str__(self):
+        return f'{self.label}, {self.function}, {self.args}, {self.kwargs}'
 
 class ParallelManager:
     """Run multiple functions in parallel and capture output"""
@@ -78,7 +80,7 @@ class ParallelManager:
         """Get the return value for a task or all return values if label is not passed"""
         return self.return_values[label] if label else self.return_values
 
-    def get_output(self, label):
+    def get_output(self, label=None):
         """Get the output for a task or all outputs if label is not passed"""
         return self.outputs[label] if label else self.outputs
 
